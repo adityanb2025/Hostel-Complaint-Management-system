@@ -1,0 +1,8 @@
+# Ignore C++ compiled files
+*.exe
+
+# Ignore Python cache
+__pycache__/
+
+# (Optional) Ignore the database if you want your teammate to generate their own 10k records
+# hostel.db
