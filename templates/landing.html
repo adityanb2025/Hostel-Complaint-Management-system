@@ -1,12 +1,22 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="row justify-content-center mt-5">
-    <div class="col-md-6 text-center">
-        <h2 class="fw-bold mb-5">Welcome to the Hostel Support System</h2>
-        <div class="d-grid gap-4">
-            <a href="/student_login" class="btn btn-primary btn-lg py-3">I am a Student</a>
-            <a href="/login" class="btn btn-dark btn-lg py-3">I am an Admin</a>
+<div class="row justify-content-center align-items-center" style="min-height: 70vh;">
+    <div class="col-md-7 text-center">
+        
+        <div class="glass-card p-5">
+            <h1 class="display-4 fw-bold mb-3">Smart Hostel Portal</h1>
+            <p class="lead mb-5 opacity-75">AI-Powered priority resolution. Discover excellence in campus living.</p>
+            
+            <div class="d-grid gap-3 d-sm-flex justify-content-sm-center">
+                <a href="/student_login" class="btn btn-light btn-lg px-5 py-3 fw-bold rounded-pill shadow-sm transition-all">
+                    Student
+                </a>
+                <a href="/login" class="btn btn-outline-light btn-lg px-5 py-3 fw-bold rounded-pill transition-all">
+                    Admin
+                </a>
+            </div>
         </div>
+
     </div>
 </div>
 {% endblock %}

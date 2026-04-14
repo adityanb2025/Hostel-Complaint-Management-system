@@ -11,9 +11,12 @@ def seed_data():
     print("Generating 10,000 complaints...")
     data = []
     for _ in range(10000):
+        dummy_email = f"student{random.randint(1000, 9999)}@example.com"
+        
         data.append((
-            f"REG{random.randint(1000, 9999)}", # Dummy Register Number
-            f"{random.randint(100, 500)}",      # Room
+            f"REG{random.randint(1000, 9999)}", 
+            dummy_email,
+            f"{random.randint(100, 500)}",      
             random.choice(categories),
             random.choice(urgencies),
             "Auto-generated issue for testing.",
@@ -21,8 +24,8 @@ def seed_data():
         ))
     
     cur.executemany('''
-        INSERT INTO complaints (register_number, room_number, category, urgency, description, age_weeks) 
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO complaints (register_number, email, room_number, category, urgency, description, age_weeks) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     ''', data)
     
     conn.commit()

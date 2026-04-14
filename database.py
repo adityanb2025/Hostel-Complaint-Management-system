@@ -11,6 +11,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS complaints (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             register_number TEXT NOT NULL,
+            email TEXT NOT NULL,
             room_number TEXT NOT NULL,
             category TEXT NOT NULL,
             urgency INTEGER NOT NULL,
@@ -24,4 +25,4 @@ def init_db():
 
 if __name__ == "__main__":
     init_db()
-    print("Database initialized with Register Number column.")
+    print("Database initialized with Email support.")

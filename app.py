@@ -3,16 +3,36 @@ import sqlite3
 import subprocess
 import math
 import json
+import smtplib
+from email.mime.text import MIMEText
 from database import get_db_connection, init_db
 
 app = Flask(__name__)
 app.secret_key = "super_secret_hostel_key" 
 
+# --- EMAIL CONFIGURATION ---
+SENDER_EMAIL = "VIT.hostelcomplaints@gmail.com" # <--- CHANGE THIS TO YOUR ACTUAL GMAIL!
+APP_PASSWORD = "ofpwpkibanrsrwyt" # Your exact app password
+
+# Updated function for Registration instead of Resolution
+def send_registration_email(recipient_email, ticket_id, room):
+    try:
+        msg = MIMEText(f"Hello,\n\nYour hostel room complaint for Room {room} has been successfully registered.\n\nOur admin team will review the issue and work to resolve it as soon as possible.\n\nThank you,\nHostel Management")
+        msg['Subject'] = f"Registered: Hostel Complaint #{ticket_id}"
+        msg['From'] = SENDER_EMAIL
+        msg['To'] = recipient_email
+
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(SENDER_EMAIL, APP_PASSWORD)
+            server.send_message(msg)
+        print(f"✅ REGISTRATION EMAIL SENT TO: {recipient_email}")
+    except Exception as e:
+        print(f"❌ Failed to send email to {recipient_email}. Error: {e}")
+
 # --- INTELLIGENT URGENCY DETECTOR ---
 def analyze_urgency(description, category):
     desc = description.lower()
     
-    # Keyword banks
     critical = ['fire', 'spark', 'short circuit', 'blood', 'flood', 'smoke', 'emergency', 'current', 'blast']
     high = ['broken', 'not working', 'urgent', 'stuck', 'smell', 'leak', 'overflow', 'power cut']
     medium = ['slow', 'noise', 'dirty', 'insects', 'fan', 'light', 'dust', 'heat']
@@ -20,8 +40,6 @@ def analyze_urgency(description, category):
     if any(word in desc for word in critical): return 5
     if any(word in desc for word in high): return 4
     if any(word in desc for word in medium): return 3
-    
-    # Fallback based on category
     if category in ['Electricity', 'Water']: return 3
     return 1 
 
@@ -49,6 +67,7 @@ def submit():
         return redirect(url_for('student_login'))
         
     reg_no = session.get('register_number')
+    email = request.form['email'] 
     room = request.form['room']
     cat = request.form['category']
     desc = request.form['description']
@@ -56,12 +75,18 @@ def submit():
     auto_urgency = analyze_urgency(desc, cat)
     
     conn = get_db_connection()
-    conn.execute('INSERT INTO complaints (register_number, room_number, category, urgency, description) VALUES (?, ?, ?, ?, ?)',
-                 (reg_no, room, cat, auto_urgency, desc))
+    # Execute and grab the cursor so we can find out the new Ticket ID
+    cursor = conn.execute('INSERT INTO complaints (register_number, email, room_number, category, urgency, description) VALUES (?, ?, ?, ?, ?, ?)',
+                 (reg_no, email, room, cat, auto_urgency, desc))
+    
+    ticket_id = cursor.lastrowid # Grabs the newly generated ID
     conn.commit()
     conn.close()
     
-    flash("Complaint submitted successfully! Urgency auto-assigned.", "success")
+    # Trigger the email immediately after saving to database
+    send_registration_email(email, ticket_id, room)
+    
+    flash("Complaint submitted successfully! Confirmation email sent.", "success")
     return redirect(url_for('portal'))
 
 # --- ADMIN ROUTES ---
@@ -80,13 +105,12 @@ def logout():
     session.clear()
     return redirect(url_for('landing'))
 
-# --- BATCH RESOLVE COMPLAINTS ROUTE ---
+# --- BATCH RESOLVE ROUTE (Emails Removed) ---
 @app.route('/batch_close', methods=['POST'])
 def batch_close():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
 
-    # Get the array of IDs sent by our Javascript
     closed_ids_json = request.form.get('closed_ids', '[]')
     try:
         closed_ids = json.loads(closed_ids_json)
@@ -95,7 +119,6 @@ def batch_close():
 
     if closed_ids:
         conn = get_db_connection()
-        # SQL trick to update multiple rows at once safely
         placeholders = ','.join('?' for _ in closed_ids)
         query = f'UPDATE complaints SET status="Closed" WHERE id IN ({placeholders})'
         conn.execute(query, closed_ids)
@@ -104,7 +127,6 @@ def batch_close():
         
         flash(f"Successfully resolved {len(closed_ids)} ticket(s).", "success")
 
-    # Redirect back to whatever page they were on
     return redirect(request.referrer or url_for('admin'))
 
 @app.route('/admin')
@@ -112,7 +134,6 @@ def admin():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
 
-    # Pagination Settings from URL
     try:
         page = int(request.args.get('page', 1))
         per_page_str = request.args.get('per_page', '10')
@@ -127,7 +148,6 @@ def admin():
 
     input_data = "\n".join([f"{r['id']} {r['room_number']} {r['category']} {r['urgency']} {r['age_weeks']}" for r in rows])
     
-    # Run the C++ engine
     process = subprocess.Popen(['./dsa/priority_engine'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
     stdout, _ = process.communicate(input=input_data)
 
@@ -137,7 +157,6 @@ def admin():
             parts = line.split('|')
             score = int(parts[3])
             
-            # Convert numeric score to visual labels
             if score >= 40:
                 label, color = "Very High", "danger"
             elif score >= 20:
@@ -151,7 +170,6 @@ def admin():
 
     total_items = len(sorted_complaints)
     
-    # Python List Slicing for Pagination
     if per_page is None:
         display_complaints = sorted_complaints
         total_pages = 1
@@ -161,14 +179,7 @@ def admin():
         display_complaints = sorted_complaints[start:end]
         total_pages = math.ceil(total_items / per_page) if per_page > 0 else 1
 
-    return render_template('admin.html', 
-                           complaints=display_complaints, 
-                           total=total_items, 
-                           page=page, 
-                           per_page=per_page_str, 
-                           total_pages=total_pages)
+    return render_template('admin.html', complaints=display_complaints, total=total_items, page=page, per_page=per_page_str, total_pages=total_pages)
 
 if __name__ == '__main__':
-    # No need to run init_db() here every time if your database is already set up, 
-    # but it is safe to keep it if you want.
     app.run(debug=True)

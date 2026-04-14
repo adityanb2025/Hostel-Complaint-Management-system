@@ -2,14 +2,14 @@
 {% block content %}
 <div class="row justify-content-center mt-5">
     <div class="col-md-5">
-        <div class="card card-custom p-5">
+        <div class="glass-card p-5">
             <h3 class="text-center fw-bold mb-4">Student Access</h3>
             <form action="/student_login" method="POST">
                 <div class="mb-4">
                     <label class="form-label fw-semibold">Register Number</label>
-                    <input type="text" name="register_number" class="form-control" required>
+                    <input type="text" name="register_number" class="form-control" required placeholder="e.g. 21BCE1023">
                 </div>
-                <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">Continue to Portal</button>
+                <button type="submit" class="btn btn-light w-100 py-2 fw-bold text-dark">Continue to Portal</button>
             </form>
         </div>
     </div>
