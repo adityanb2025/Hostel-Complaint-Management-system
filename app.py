@@ -2,13 +2,17 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 import sqlite3
 import subprocess
 import math
+import json
 from database import get_db_connection, init_db
 
 app = Flask(__name__)
 app.secret_key = "super_secret_hostel_key" 
 
+# --- INTELLIGENT URGENCY DETECTOR ---
 def analyze_urgency(description, category):
     desc = description.lower()
+    
+    # Keyword banks
     critical = ['fire', 'spark', 'short circuit', 'blood', 'flood', 'smoke', 'emergency', 'current', 'blast']
     high = ['broken', 'not working', 'urgent', 'stuck', 'smell', 'leak', 'overflow', 'power cut']
     medium = ['slow', 'noise', 'dirty', 'insects', 'fan', 'light', 'dust', 'heat']
@@ -16,9 +20,12 @@ def analyze_urgency(description, category):
     if any(word in desc for word in critical): return 5
     if any(word in desc for word in high): return 4
     if any(word in desc for word in medium): return 3
+    
+    # Fallback based on category
     if category in ['Electricity', 'Water']: return 3
     return 1 
 
+# --- STUDENT ROUTES ---
 @app.route('/')
 def landing():
     return render_template('landing.html')
@@ -57,6 +64,7 @@ def submit():
     flash("Complaint submitted successfully! Urgency auto-assigned.", "success")
     return redirect(url_for('portal'))
 
+# --- ADMIN ROUTES ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -72,19 +80,32 @@ def logout():
     session.clear()
     return redirect(url_for('landing'))
 
-# --- NEW RESOLVE COMPLAINT ROUTE ---
-@app.route('/close/<int:id>', methods=['POST'])
-def close_complaint(id):
+# --- BATCH RESOLVE COMPLAINTS ROUTE ---
+@app.route('/batch_close', methods=['POST'])
+def batch_close():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
 
-    conn = get_db_connection()
-    conn.execute('UPDATE complaints SET status="Closed" WHERE id=?', (id,))
-    conn.commit()
-    conn.close()
+    # Get the array of IDs sent by our Javascript
+    closed_ids_json = request.form.get('closed_ids', '[]')
+    try:
+        closed_ids = json.loads(closed_ids_json)
+    except:
+        closed_ids = []
 
-    flash(f"Ticket #{id} has been successfully resolved.", "success")
-    return redirect(url_for('admin'))
+    if closed_ids:
+        conn = get_db_connection()
+        # SQL trick to update multiple rows at once safely
+        placeholders = ','.join('?' for _ in closed_ids)
+        query = f'UPDATE complaints SET status="Closed" WHERE id IN ({placeholders})'
+        conn.execute(query, closed_ids)
+        conn.commit()
+        conn.close()
+        
+        flash(f"Successfully resolved {len(closed_ids)} ticket(s).", "success")
+
+    # Redirect back to whatever page they were on
+    return redirect(request.referrer or url_for('admin'))
 
 @app.route('/admin')
 def admin():
@@ -106,6 +127,7 @@ def admin():
 
     input_data = "\n".join([f"{r['id']} {r['room_number']} {r['category']} {r['urgency']} {r['age_weeks']}" for r in rows])
     
+    # Run the C++ engine
     process = subprocess.Popen(['./dsa/priority_engine'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
     stdout, _ = process.communicate(input=input_data)
 
@@ -147,4 +169,6 @@ def admin():
                            total_pages=total_pages)
 
 if __name__ == '__main__':
+    # No need to run init_db() here every time if your database is already set up, 
+    # but it is safe to keep it if you want.
     app.run(debug=True)

@@ -1,15 +1,22 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-start mb-4">
     <h2 class="fw-bold">Complaints List</h2>
-    <span class="badge bg-primary fs-6 py-2 px-3">Pending Issues: {{ total }}</span>
+    <div class="text-end">
+        <span class="badge bg-primary fs-6 py-2 px-3 d-block mb-2">Pending Issues: {{ total }}</span>
+        
+        <form id="batch-form" action="/batch_close" method="POST" class="d-none">
+            <input type="hidden" name="closed_ids" id="closed-ids-input" value="[]">
+            <button type="submit" class="btn btn-sm btn-success fw-bold px-3 shadow animation-fade">✓ Confirm Changes</button>
+        </form>
+    </div>
 </div>
 
 <div class="d-flex justify-content-between mb-3 align-items-center">
     <div>
-        <form method="GET" action="/admin" class="d-inline-block">
+        <form method="GET" action="/admin" class="d-inline-block" id="per-page-form">
             <label class="fw-semibold me-2 text-muted">Show entries:</label>
-            <select name="per_page" class="form-select form-select-sm d-inline-block w-auto shadow-sm" onchange="this.form.submit()">
+            <select name="per_page" id="per-page-select" class="form-select form-select-sm d-inline-block w-auto shadow-sm">
                 <option value="10" {% if per_page == '10' %}selected{% endif %}>10</option>
                 <option value="100" {% if per_page == '100' %}selected{% endif %}>100</option>
                 <option value="1000" {% if per_page == '1000' %}selected{% endif %}>1000</option>
@@ -23,30 +30,30 @@
     <nav>
         <ul class="pagination pagination-sm mb-0 shadow-sm">
             <li class="page-item {% if page <= 1 %}disabled{% endif %}">
-                <a class="page-link" href="?page={{ page - 1 }}&per_page={{ per_page }}">Previous</a>
+                <a class="page-link page-nav-link" href="?page={{ page - 1 }}&per_page={{ per_page }}">Previous</a>
             </li>
             
             {% set start_page = page - 2 if page - 2 > 0 else 1 %}
             {% set end_page = page + 2 if page + 2 <= total_pages else total_pages %}
             
             {% if start_page > 1 %}
-                <li class="page-item"><a class="page-link" href="?page=1&per_page={{ per_page }}">1</a></li>
+                <li class="page-item"><a class="page-link page-nav-link" href="?page=1&per_page={{ per_page }}">1</a></li>
                 {% if start_page > 2 %}<li class="page-item disabled"><span class="page-link">...</span></li>{% endif %}
             {% endif %}
             
             {% for p in range(start_page, end_page + 1) %}
                 <li class="page-item {% if p == page %}active{% endif %}">
-                    <a class="page-link" href="?page={{ p }}&per_page={{ per_page }}">{{ p }}</a>
+                    <a class="page-link page-nav-link" href="?page={{ p }}&per_page={{ per_page }}">{{ p }}</a>
                 </li>
             {% endfor %}
             
             {% if end_page < total_pages %}
                 {% if end_page < total_pages - 1 %}<li class="page-item disabled"><span class="page-link">...</span></li>{% endif %}
-                <li class="page-item"><a class="page-link" href="?page={{ total_pages }}&per_page={{ per_page }}">{{ total_pages }}</a></li>
+                <li class="page-item"><a class="page-link page-nav-link" href="?page={{ total_pages }}&per_page={{ per_page }}">{{ total_pages }}</a></li>
             {% endif %}
 
             <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
-                <a class="page-link" href="?page={{ page + 1 }}&per_page={{ per_page }}">Next</a>
+                <a class="page-link page-nav-link" href="?page={{ page + 1 }}&per_page={{ per_page }}">Next</a>
             </li>
         </ul>
     </nav>
@@ -61,8 +68,7 @@
                 <th class="py-3">Room</th>
                 <th class="py-3">Category</th>
                 <th class="py-3 text-center">Urgency Level</th>
-                <th class="py-3 text-center">Action</th>
-            </tr>
+                <th class="py-3 text-center">Status</th> </tr>
         </thead>
         <tbody>
             {% for c in complaints %}
@@ -74,9 +80,9 @@
                     <span class="badge bg-{{ c.color }} rounded-pill px-3">{{ c.label }}</span>
                 </td>
                 <td class="text-center">
-                    <form action="/close/{{ c.id }}" method="POST" class="m-0">
-                        <button type="submit" class="btn btn-sm btn-success fw-bold px-3 shadow-sm rounded-3">&#10003; Resolve</button>
-                    </form>
+                    <button type="button" class="btn btn-sm btn-danger fw-bold px-3 shadow-sm rounded-3 toggle-status-btn" data-id="{{ c.id }}">
+                        Pending
+                    </button>
                 </td>
             </tr>
             {% endfor %}
@@ -88,4 +94,75 @@
         </tbody>
     </table>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        let changedIds = new Set(); // Tracks tickets we've marked completed
+        const confirmForm = document.getElementById('batch-form');
+        const closedIdsInput = document.getElementById('closed-ids-input');
+        const toggleBtns = document.querySelectorAll('.toggle-status-btn');
+
+        // 1. Button Click Logic
+        toggleBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const id = this.getAttribute('data-id');
+                
+                if (changedIds.has(id)) {
+                    // Undo: Switch back to Pending
+                    changedIds.delete(id);
+                    this.classList.remove('btn-success');
+                    this.classList.add('btn-danger');
+                    this.innerHTML = 'Pending';
+                } else {
+                    // Action: Switch to Completed
+                    changedIds.add(id);
+                    this.classList.remove('btn-danger');
+                    this.classList.add('btn-success');
+                    this.innerHTML = '✓ Completed';
+                }
+
+                // Show or Hide the Confirm button at the top
+                if (changedIds.size > 0) {
+                    confirmForm.classList.remove('d-none');
+                    closedIdsInput.value = JSON.stringify(Array.from(changedIds));
+                } else {
+                    confirmForm.classList.add('d-none');
+                }
+            });
+        });
+
+        // 2. Pagination Guard (Warning Popup)
+        function checkUnsavedAndSave(e) {
+            if (changedIds.size > 0) {
+                const wantToSave = confirm("You have unsaved changes! Do you want to confirm these changes before leaving the page?");
+                if (wantToSave) {
+                    e.preventDefault(); // Stop them from leaving
+                    confirmForm.submit(); // Save the data instead
+                }
+                // If they click Cancel, it proceeds to the next page and discards changes
+            }
+        }
+
+        // Apply guard to page numbers
+        document.querySelectorAll('.page-nav-link').forEach(link => {
+            link.addEventListener('click', checkUnsavedAndSave);
+        });
+
+        // Apply guard to dropdown
+        const perPageSelect = document.getElementById('per-page-select');
+        if (perPageSelect) {
+            perPageSelect.addEventListener('change', function(e) {
+                if (changedIds.size > 0) {
+                    const wantToSave = confirm("You have unsaved changes! Do you want to confirm these changes before changing the view?");
+                    if (wantToSave) {
+                        e.preventDefault();
+                        confirmForm.submit();
+                        return;
+                    }
+                }
+                document.getElementById('per-page-form').submit();
+            });
+        }
+    });
+</script>
 {% endblock %}
