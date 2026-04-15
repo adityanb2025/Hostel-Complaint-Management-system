@@ -11,13 +11,12 @@ app = Flask(__name__)
 app.secret_key = "super_secret_hostel_key" 
 
 # --- EMAIL CONFIGURATION ---
-SENDER_EMAIL = "VIT.hostelcomplaints@gmail.com" # <--- CHANGE THIS TO YOUR ACTUAL GMAIL!
-APP_PASSWORD = "ofpwpkibanrsrwyt" # Your exact app password
+SENDER_EMAIL = "VIT.hostelcomplaints@gmail.com" 
+APP_PASSWORD = "ofpwpkibanrsrwyt" 
 
-# Updated function for Registration instead of Resolution
 def send_registration_email(recipient_email, ticket_id, room):
     try:
-        msg = MIMEText(f"Hello,\n\nYour hostel room complaint for Room {room} has been successfully registered.\n\nOur admin team will review the issue and work to resolve it as soon as possible.\n\nThank you,\nHostel Management")
+        msg = MIMEText(f"Hello,\n\nYour hostel room complaint for Room {room} (Ticket #{ticket_id}) has been successfully registered.\n\nOur admin team will review the issue and work to resolve it as soon as possible.\n\nThank you,\nHostel Management")
         msg['Subject'] = f"Registered: Hostel Complaint #{ticket_id}"
         msg['From'] = SENDER_EMAIL
         msg['To'] = recipient_email
@@ -29,10 +28,36 @@ def send_registration_email(recipient_email, ticket_id, room):
     except Exception as e:
         print(f"❌ Failed to send email to {recipient_email}. Error: {e}")
 
+def send_verification_email(recipient_email, ticket_id, room, host_url):
+    try:
+        html = f"""
+        <html><body>
+        <p>Hello,</p>
+        <p>The admin team has marked your hostel complaint <b>#{ticket_id} (Room {room})</b> as resolved.</p>
+        <p>Please confirm if the issue is actually fixed:</p>
+        <br>
+        <a href="{host_url}verify/{ticket_id}/yes" style="padding: 10px 20px; background: #198754; color: white; text-decoration: none; border-radius: 5px; font-family: sans-serif; font-weight: bold;">✓ Yes, it is fixed</a>
+        <br><br><br>
+        <a href="{host_url}verify/{ticket_id}/no" style="padding: 10px 20px; background: #dc3545; color: white; text-decoration: none; border-radius: 5px; font-family: sans-serif; font-weight: bold;">✕ No, I still need help</a>
+        <br><br>
+        <p>Thank you,<br>Hostel Management</p>
+        </body></html>
+        """
+        msg = MIMEText(html, 'html')
+        msg['Subject'] = f"Action Required: Is Complaint #{ticket_id} fixed?"
+        msg['From'] = SENDER_EMAIL
+        msg['To'] = recipient_email
+
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(SENDER_EMAIL, APP_PASSWORD)
+            server.send_message(msg)
+        print(f"✅ VERIFICATION EMAIL SENT TO: {recipient_email}")
+    except Exception as e:
+        print(f"❌ Failed to send verification to {recipient_email}. Error: {e}")
+
 # --- INTELLIGENT URGENCY DETECTOR ---
 def analyze_urgency(description, category):
     desc = description.lower()
-    
     critical = ['fire', 'spark', 'short circuit', 'blood', 'flood', 'smoke', 'emergency', 'current', 'blast']
     high = ['broken', 'not working', 'urgent', 'stuck', 'smell', 'leak', 'overflow', 'power cut']
     medium = ['slow', 'noise', 'dirty', 'insects', 'fan', 'light', 'dust', 'heat']
@@ -75,19 +100,40 @@ def submit():
     auto_urgency = analyze_urgency(desc, cat)
     
     conn = get_db_connection()
-    # Execute and grab the cursor so we can find out the new Ticket ID
     cursor = conn.execute('INSERT INTO complaints (register_number, email, room_number, category, urgency, description) VALUES (?, ?, ?, ?, ?, ?)',
                  (reg_no, email, room, cat, auto_urgency, desc))
-    
-    ticket_id = cursor.lastrowid # Grabs the newly generated ID
+    ticket_id = cursor.lastrowid 
     conn.commit()
     conn.close()
     
-    # Trigger the email immediately after saving to database
     send_registration_email(email, ticket_id, room)
-    
     flash("Complaint submitted successfully! Confirmation email sent.", "success")
     return redirect(url_for('portal'))
+
+@app.route('/verify/<int:ticket_id>/<action>')
+def verify_ticket(ticket_id, action):
+    conn = get_db_connection()
+    if action == 'yes':
+        conn.execute('UPDATE complaints SET status="Closed" WHERE id=?', (ticket_id,))
+        msg = "Ticket Closed. Thank you for confirming!"
+        color = "success"
+    elif action == 'no':
+        conn.execute('UPDATE complaints SET status="Reopened" WHERE id=?', (ticket_id,))
+        msg = "Ticket Reopened. The admin has been notified and it is back at the top of their queue."
+        color = "danger"
+    conn.commit()
+    conn.close()
+    
+    html = f"""
+    <html><head><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"></head>
+    <body class="bg-dark text-white d-flex align-items-center justify-content-center" style="height: 100vh;">
+        <div class="text-center p-5 rounded-4 shadow" style="background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2);">
+            <h2 class="text-{color} fw-bold mb-3">{msg}</h2>
+            <p class="opacity-75">You can safely close this browser tab.</p>
+        </div>
+    </body></html>
+    """
+    return html
 
 # --- ADMIN ROUTES ---
 @app.route('/login', methods=['GET', 'POST'])
@@ -105,7 +151,6 @@ def logout():
     session.clear()
     return redirect(url_for('landing'))
 
-# --- BATCH RESOLVE ROUTE (Emails Removed) ---
 @app.route('/batch_close', methods=['POST'])
 def batch_close():
     if not session.get('logged_in'):
@@ -120,12 +165,22 @@ def batch_close():
     if closed_ids:
         conn = get_db_connection()
         placeholders = ','.join('?' for _ in closed_ids)
-        query = f'UPDATE complaints SET status="Closed" WHERE id IN ({placeholders})'
+        
+        cursor = conn.execute(f'SELECT id, email, room_number FROM complaints WHERE id IN ({placeholders})', closed_ids)
+        resolved_tickets = cursor.fetchall()
+        
+        query = f'UPDATE complaints SET status="Pending Student Confirmation" WHERE id IN ({placeholders})'
         conn.execute(query, closed_ids)
         conn.commit()
         conn.close()
+
+        host_url = request.host_url
+        print("\n" + "="*50)
+        for ticket in resolved_tickets:
+            send_verification_email(ticket['email'], ticket['id'], ticket['room_number'], host_url)
+        print("="*50 + "\n")
         
-        flash(f"Successfully resolved {len(closed_ids)} ticket(s).", "success")
+        flash(f"Tickets updated. Verification emails sent to {len(closed_ids)} student(s).", "success")
 
     return redirect(request.referrer or url_for('admin'))
 
@@ -134,6 +189,7 @@ def admin():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
 
+    # 1. Get Pagination Parameters
     try:
         page = int(request.args.get('page', 1))
         per_page_str = request.args.get('per_page', '10')
@@ -142,31 +198,66 @@ def admin():
         page, per_page = 1, 10
         per_page_str = '10'
 
+    # 2. Get Filter Parameters
+    filter_category = request.args.get('category', '')
+    filter_urgency = request.args.get('urgency', '')
+    search_id = request.args.get('ticket_id', '').strip()
+    
+    # Strip the hashtag if the admin typed "#123" instead of just "123"
+    search_id_clean = search_id.replace('#', '')
+
+    # 3. Build Dynamic SQL Query
+    query = 'SELECT id, room_number, category, urgency, age_weeks, status FROM complaints WHERE status IN ("Pending", "Reopened")'
+    params = []
+
+    if search_id_clean.isdigit():
+        query += ' AND id = ?'
+        params.append(int(search_id_clean))
+    if filter_category:
+        query += ' AND category = ?'
+        params.append(filter_category)
+
     conn = get_db_connection()
-    rows = conn.execute('SELECT id, room_number, category, urgency, age_weeks FROM complaints WHERE status="Pending"').fetchall()
+    rows = conn.execute(query, params).fetchall()
     conn.close()
 
-    input_data = "\n".join([f"{r['id']} {r['room_number']} {r['category']} {r['urgency']} {r['age_weeks']}" for r in rows])
+    status_map = {str(r['id']): r['status'] for r in rows}
+
+    input_data = []
+    for r in rows:
+        effective_urgency = r['urgency'] + 10 if r['status'] == 'Reopened' else r['urgency']
+        input_data.append(f"{r['id']} {r['room_number']} {r['category']} {effective_urgency} {r['age_weeks']}")
     
-    process = subprocess.Popen(['./dsa/priority_engine'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
-    stdout, _ = process.communicate(input=input_data)
-
+    input_text = "\n".join(input_data)
+    
     sorted_complaints = []
-    for line in stdout.strip().split('\n'):
-        if line:
-            parts = line.split('|')
-            score = int(parts[3])
-            
-            if score >= 40:
-                label, color = "Very High", "danger"
-            elif score >= 20:
-                label, color = "High", "warning text-dark"
-            elif score >= 10:
-                label, color = "Medium", "info text-dark"
-            else:
-                label, color = "Low", "secondary"
+    
+    # 4. Only run C++ if we actually found results (Prevents Crash)
+    if input_text:
+        process = subprocess.Popen(['./dsa/priority_engine'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+        stdout, _ = process.communicate(input=input_text)
 
-            sorted_complaints.append({'id': parts[0], 'room': parts[1], 'category': parts[2], 'label': label, 'color': color})
+        for line in stdout.strip().split('\n'):
+            if line:
+                parts = line.split('|')
+                ticket_id = parts[0]
+                score = int(parts[3])
+                
+                if score >= 40:
+                    label, color = "Very High", "danger"
+                elif score >= 20:
+                    label, color = "High", "warning text-dark"
+                elif score >= 10:
+                    label, color = "Medium", "info text-dark"
+                else:
+                    label, color = "Low", "secondary"
+
+                # 5. Filter by Urgency (Post C++ Calculation)
+                if filter_urgency and label != filter_urgency:
+                    continue
+
+                actual_status = status_map.get(ticket_id, "Pending")
+                sorted_complaints.append({'id': ticket_id, 'room': parts[1], 'category': parts[2], 'label': label, 'color': color, 'status': actual_status})
 
     total_items = len(sorted_complaints)
     
@@ -179,7 +270,15 @@ def admin():
         display_complaints = sorted_complaints[start:end]
         total_pages = math.ceil(total_items / per_page) if per_page > 0 else 1
 
-    return render_template('admin.html', complaints=display_complaints, total=total_items, page=page, per_page=per_page_str, total_pages=total_pages)
+    return render_template('admin.html', 
+                           complaints=display_complaints, 
+                           total=total_items, 
+                           page=page, 
+                           per_page=per_page_str, 
+                           total_pages=total_pages,
+                           filter_category=filter_category,
+                           filter_urgency=filter_urgency,
+                           search_id=search_id)
 
 if __name__ == '__main__':
     app.run(debug=True)

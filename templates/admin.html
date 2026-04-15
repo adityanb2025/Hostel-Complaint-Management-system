@@ -3,7 +3,7 @@
 <div class="d-flex justify-content-between align-items-start mb-4">
     <h2 class="fw-bold text-white">Complaints List</h2>
     <div class="text-end">
-        <span class="badge bg-primary fs-6 py-2 px-3 d-block mb-2 shadow-sm">Pending Issues: {{ total }}</span>
+        <span class="badge bg-primary fs-6 py-2 px-3 d-block mb-2 shadow-sm">Filtered Issues: {{ total }}</span>
         
         <form id="batch-form" action="/batch_close" method="POST" class="d-none">
             <input type="hidden" name="closed_ids" id="closed-ids-input" value="[]">
@@ -12,15 +12,52 @@
     </div>
 </div>
 
+<div class="glass-card p-3 mb-4">
+    <form method="GET" action="/admin" class="row g-2 align-items-center">
+        <input type="hidden" name="per_page" value="{{ per_page }}">
+        
+        <div class="col-md-3">
+            <input type="text" name="ticket_id" class="form-control text-white" placeholder="Search Ticket ID..." value="{{ search_id }}">
+        </div>
+        <div class="col-md-3">
+            <select name="category" class="form-select text-white">
+                <option value="">All Categories</option>
+                <option value="Electricity" {% if filter_category == 'Electricity' %}selected{% endif %}>Electricity</option>
+                <option value="Water" {% if filter_category == 'Water' %}selected{% endif %}>Water</option>
+                <option value="Food" {% if filter_category == 'Food' %}selected{% endif %}>Food</option>
+                <option value="WiFi" {% if filter_category == 'WiFi' %}selected{% endif %}>WiFi</option>
+                <option value="Room" {% if filter_category == 'Room' %}selected{% endif %}>Room Maintenance</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <select name="urgency" class="form-select text-white">
+                <option value="">All Urgency Levels</option>
+                <option value="Very High" {% if filter_urgency == 'Very High' %}selected{% endif %}>Very High</option>
+                <option value="High" {% if filter_urgency == 'High' %}selected{% endif %}>High</option>
+                <option value="Medium" {% if filter_urgency == 'Medium' %}selected{% endif %}>Medium</option>
+                <option value="Low" {% if filter_urgency == 'Low' %}selected{% endif %}>Low</option>
+            </select>
+        </div>
+        <div class="col-md-3 d-flex gap-2">
+            <button type="submit" class="btn btn-primary fw-bold w-100 shadow-sm">Filter</button>
+            <a href="/admin?per_page={{ per_page }}" class="btn btn-outline-light w-100 shadow-sm">Clear</a>
+        </div>
+    </form>
+</div>
+
 <div class="d-flex justify-content-between mb-3 align-items-center">
     <div>
         <form method="GET" action="/admin" class="d-inline-block" id="per-page-form">
+            <input type="hidden" name="ticket_id" value="{{ search_id }}">
+            <input type="hidden" name="category" value="{{ filter_category }}">
+            <input type="hidden" name="urgency" value="{{ filter_urgency }}">
+            
             <label class="fw-semibold me-2 opacity-75">Show entries:</label>
             <select name="per_page" id="per-page-select" class="form-select form-select-sm d-inline-block w-auto shadow-sm">
                 <option value="10" {% if per_page == '10' %}selected{% endif %}>10</option>
+                <option value="50" {% if per_page == '50' %}selected{% endif %}>50</option>
                 <option value="100" {% if per_page == '100' %}selected{% endif %}>100</option>
-                <option value="1000" {% if per_page == '1000' %}selected{% endif %}>1000</option>
-                <option value="all" {% if per_page == 'all' %}selected{% endif %}>All</option>
+                <option value="500" {% if per_page == '500' %}selected{% endif %}>Max (500)</option>
             </select>
             <input type="hidden" name="page" value="1">
         </form>
@@ -30,30 +67,30 @@
     <nav>
         <ul class="pagination pagination-sm mb-0 shadow-sm">
             <li class="page-item {% if page <= 1 %}disabled{% endif %}">
-                <a class="page-link page-nav-link" href="?page={{ page - 1 }}&per_page={{ per_page }}">Previous</a>
+                <a class="page-link page-nav-link" href="?page={{ page - 1 }}&per_page={{ per_page }}&ticket_id={{ search_id }}&category={{ filter_category }}&urgency={{ filter_urgency }}">Previous</a>
             </li>
             
             {% set start_page = page - 2 if page - 2 > 0 else 1 %}
             {% set end_page = page + 2 if page + 2 <= total_pages else total_pages %}
             
             {% if start_page > 1 %}
-                <li class="page-item"><a class="page-link page-nav-link" href="?page=1&per_page={{ per_page }}">1</a></li>
+                <li class="page-item"><a class="page-link page-nav-link" href="?page=1&per_page={{ per_page }}&ticket_id={{ search_id }}&category={{ filter_category }}&urgency={{ filter_urgency }}">1</a></li>
                 {% if start_page > 2 %}<li class="page-item disabled"><span class="page-link">...</span></li>{% endif %}
             {% endif %}
             
             {% for p in range(start_page, end_page + 1) %}
                 <li class="page-item {% if p == page %}active{% endif %}">
-                    <a class="page-link page-nav-link" href="?page={{ p }}&per_page={{ per_page }}">{{ p }}</a>
+                    <a class="page-link page-nav-link" href="?page={{ p }}&per_page={{ per_page }}&ticket_id={{ search_id }}&category={{ filter_category }}&urgency={{ filter_urgency }}">{{ p }}</a>
                 </li>
             {% endfor %}
             
             {% if end_page < total_pages %}
                 {% if end_page < total_pages - 1 %}<li class="page-item disabled"><span class="page-link">...</span></li>{% endif %}
-                <li class="page-item"><a class="page-link page-nav-link" href="?page={{ total_pages }}&per_page={{ per_page }}">{{ total_pages }}</a></li>
+                <li class="page-item"><a class="page-link page-nav-link" href="?page={{ total_pages }}&per_page={{ per_page }}&ticket_id={{ search_id }}&category={{ filter_category }}&urgency={{ filter_urgency }}">{{ total_pages }}</a></li>
             {% endif %}
 
             <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
-                <a class="page-link page-nav-link" href="?page={{ page + 1 }}&per_page={{ per_page }}">Next</a>
+                <a class="page-link page-nav-link" href="?page={{ page + 1 }}&per_page={{ per_page }}&ticket_id={{ search_id }}&category={{ filter_category }}&urgency={{ filter_urgency }}">Next</a>
             </li>
         </ul>
     </nav>
@@ -74,7 +111,12 @@
         <tbody id="complaints-table-body">
             {% for c in complaints %}
             <tr>
-                <td class="px-4 fw-bold text-white">#{{ c.id }}</td>
+                <td class="px-4 fw-bold text-white">
+                    #{{ c.id }}
+                    {% if c.status == 'Reopened' %}
+                        <span class="badge bg-danger ms-2 border border-light">Reopened!</span>
+                    {% endif %}
+                </td>
                 <td class="fw-semibold text-white">{{ c.room }}</td>
                 <td class="text-white">{{ c.category }}</td>
                 <td class="text-center">
@@ -89,7 +131,7 @@
             {% endfor %}
             {% if not complaints %}
             <tr>
-                <td colspan="5" class="text-center py-4 opacity-50">No pending complaints!</td>
+                <td colspan="5" class="text-center py-4 opacity-50">No tickets found matching those filters!</td>
             </tr>
             {% endif %}
         </tbody>
@@ -102,12 +144,9 @@
         const confirmForm = document.getElementById('batch-form');
         const closedIdsInput = document.getElementById('closed-ids-input');
 
-        // EVENT DELEGATION: We attach ONE listener to the whole table body.
-        // This stops Chrome from crashing when rendering 10,000 items.
         const tableBody = document.getElementById('complaints-table-body');
         if (tableBody) {
             tableBody.addEventListener('click', function(e) {
-                // Check if the thing they clicked was actually our toggle button
                 if (e.target.classList.contains('toggle-status-btn')) {
                     const btn = e.target;
                     const id = btn.getAttribute('data-id');
@@ -144,7 +183,6 @@
             }
         }
 
-        // Event delegation for pagination links to improve performance
         document.addEventListener('click', function(e) {
             if (e.target.classList.contains('page-nav-link')) {
                 checkUnsavedAndSave(e);
