@@ -7,8 +7,12 @@ def get_db_connection():
 
 def init_db():
     conn = get_db_connection()
+    
+    # --- NEW: Destroy the old table if it exists so we never double-seed! ---
+    conn.execute('DROP TABLE IF EXISTS complaints')
+    
     conn.execute('''
-        CREATE TABLE IF NOT EXISTS complaints (
+        CREATE TABLE complaints (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             register_number TEXT NOT NULL,
             email TEXT NOT NULL,
@@ -25,4 +29,4 @@ def init_db():
 
 if __name__ == "__main__":
     init_db()
-    print("Database initialized with Email support.")
+    print("Database wiped and initialized with Email support.")
