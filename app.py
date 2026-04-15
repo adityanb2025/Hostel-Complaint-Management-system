@@ -5,13 +5,14 @@ import math
 import json
 import smtplib
 from email.mime.text import MIMEText
+import threading
 from database import get_db_connection, init_db
 
 app = Flask(__name__)
 app.secret_key = "super_secret_hostel_key" 
 
 # --- EMAIL CONFIGURATION ---
-SENDER_EMAIL = "VIT.hostelcomplaints@gmail.com" 
+SENDER_EMAIL = "YOUR_NEW_GMAIL_ADDRESS@gmail.com" # <--- REPLACE WITH YOUR PROJECT GMAIL
 APP_PASSWORD = "ofpwpkibanrsrwyt" 
 
 def send_registration_email(recipient_email, ticket_id, room):
@@ -106,7 +107,10 @@ def submit():
     conn.commit()
     conn.close()
     
-    send_registration_email(email, ticket_id, room)
+    # Send email in the background to prevent 502 Bad Gateway timeouts
+    email_thread = threading.Thread(target=send_registration_email, args=(email, ticket_id, room))
+    email_thread.start()
+    
     flash("Complaint submitted successfully! Confirmation email sent.", "success")
     return redirect(url_for('portal'))
 
@@ -177,7 +181,9 @@ def batch_close():
         host_url = request.host_url
         print("\n" + "="*50)
         for ticket in resolved_tickets:
-            send_verification_email(ticket['email'], ticket['id'], ticket['room_number'], host_url)
+            # Send verification emails in the background to prevent 502 timeouts
+            email_thread = threading.Thread(target=send_verification_email, args=(ticket['email'], ticket['id'], ticket['room_number'], host_url))
+            email_thread.start()
         print("="*50 + "\n")
         
         flash(f"Tickets updated. Verification emails sent to {len(closed_ids)} student(s).", "success")
@@ -189,7 +195,6 @@ def admin():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
 
-    # 1. Get Pagination Parameters
     try:
         page = int(request.args.get('page', 1))
         per_page_str = request.args.get('per_page', '10')
@@ -198,15 +203,12 @@ def admin():
         page, per_page = 1, 10
         per_page_str = '10'
 
-    # 2. Get Filter Parameters
     filter_category = request.args.get('category', '')
     filter_urgency = request.args.get('urgency', '')
     search_id = request.args.get('ticket_id', '').strip()
     
-    # Strip the hashtag if the admin typed "#123" instead of just "123"
     search_id_clean = search_id.replace('#', '')
 
-    # 3. Build Dynamic SQL Query
     query = 'SELECT id, room_number, category, urgency, age_weeks, status FROM complaints WHERE status IN ("Pending", "Reopened")'
     params = []
 
@@ -232,7 +234,6 @@ def admin():
     
     sorted_complaints = []
     
-    # 4. Only run C++ if we actually found results (Prevents Crash)
     if input_text:
         process = subprocess.Popen(['./dsa/priority_engine'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
         stdout, _ = process.communicate(input=input_text)
@@ -252,7 +253,6 @@ def admin():
                 else:
                     label, color = "Low", "secondary"
 
-                # 5. Filter by Urgency (Post C++ Calculation)
                 if filter_urgency and label != filter_urgency:
                     continue
 
