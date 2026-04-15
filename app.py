@@ -12,7 +12,7 @@ app = Flask(__name__)
 app.secret_key = "super_secret_hostel_key" 
 
 # --- EMAIL CONFIGURATION ---
-SENDER_EMAIL = "YOUR_NEW_GMAIL_ADDRESS@gmail.com" # <--- REPLACE WITH YOUR PROJECT GMAIL
+SENDER_EMAIL = "VIT.hostelcomplaints@gmail.com" # <--- REPLACE WITH YOUR PROJECT GMAIL
 APP_PASSWORD = "ofpwpkibanrsrwyt" 
 
 def send_registration_email(recipient_email, ticket_id, room):
