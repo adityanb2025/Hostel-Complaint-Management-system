@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold text-white">System Analytics Dashboard</h2>
+    <a href="/admin" class="btn btn-outline-light">← Back to Queue</a>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="glass-card p-4 text-center h-100">
+            <h5 class="text-white fw-bold mb-4">Pending Issues by Category</h5>
+            <div style="position: relative; height:300px; width:100%; display: flex; justify-content: center;">
+                <canvas id="catChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="glass-card p-4 text-center h-100">
+            <h5 class="text-white fw-bold mb-4">System Load by Urgency Level</h5>
+            <div style="position: relative; height:300px; width:100%">
+                <canvas id="urgChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const chartData = {{ chart_data | tojson }};
+    
+    // Category Doughnut Chart
+    new Chart(document.getElementById('catChart'), {
+        type: 'doughnut',
+        data: {
+            labels: chartData.cats,
+            datasets: [{
+                data: chartData.cat_counts,
+                backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'],
+                borderWidth: 0,
+                hoverOffset: 10
+            }]
+        },
+        options: { 
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { 
+                legend: { position: 'bottom', labels: { color: 'white', padding: 20, font: {size: 14} } } 
+            } 
+        }
+    });
+
+    // Urgency Bar Chart
+    new Chart(document.getElementById('urgChart'), {
+        type: 'bar',
+        data: {
+            labels: chartData.urgs,
+            datasets: [{
+                label: 'Active Tickets',
+                data: chartData.urg_counts,
+                backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                borderRadius: 5
+            }]
+        },
+        options: { 
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { 
+                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: 'white' } }, 
+                x: { grid: { display: false }, ticks: { color: 'white', font: {size: 14} } } 
+            }, 
+            plugins: { legend: { display: false } } 
+        }
+    });
+</script>
+{% endblock %}

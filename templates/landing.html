@@ -1,22 +1,14 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
 {% block content %}
-<div class="row justify-content-center align-items-center" style="min-height: 70vh;">
-    <div class="col-md-7 text-center">
-        
-        <div class="glass-card p-5">
-            <h1 class="display-4 fw-bold mb-3">Smart Hostel Portal</h1>
-            <p class="lead mb-5 opacity-75">AI-Powered priority resolution. Discover excellence in campus living.</p>
-            
-            <div class="d-grid gap-3 d-sm-flex justify-content-sm-center">
-                <a href="/student_login" class="btn btn-light btn-lg px-5 py-3 fw-bold rounded-pill shadow-sm transition-all">
-                    Student
-                </a>
-                <a href="/login" class="btn btn-outline-light btn-lg px-5 py-3 fw-bold rounded-pill transition-all">
-                    Admin
-                </a>
-            </div>
+<div class="row align-items-center" style="min-height: 80vh;">
+    <div class="col-md-6 text-white pe-md-5">
+        <h1 class="display-3 fw-bolder mb-4" style="text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">Smart Hostel Resolution System</h1>
+        <p class="lead mb-4 opacity-75">Powered by an advanced algorithmic routing engine to automatically prioritize, assign, and track maintenance issues across the campus in real-time.</p>
+        <div class="d-flex gap-3 mt-5">
+            <a href="/student_login" class="btn btn-primary btn-lg shadow-sm">Student Portal</a>
+            <a href="/worker_login" class="btn btn-warning btn-lg shadow-sm text-dark">Worker Login</a>
+            <a href="/login" class="btn btn-outline-light btn-lg">Admin Login</a>
         </div>
-
     </div>
 </div>
 {% endblock %}

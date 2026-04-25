@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-4">
+        <div class="glass-card p-5 text-center">
+            <h3 class="fw-bold mb-4">Worker Portal</h3>
+            <form action="/worker_login" method="POST">
+                <input type="number" class="form-control form-control-lg mb-3" name="worker_id" placeholder="Enter Worker ID (1-100)" required min="1" max="100">
+                <button type="submit" class="btn btn-warning w-100 btn-lg fw-bold shadow">Login</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -4,7 +4,6 @@
     <title>Smart Hostel System</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <style>
-        /* Global Animated Wave Background - Preservation of exact speed and colors */
         body {
             margin: 0;
             background: linear-gradient(-45deg, #0f172a, #1e293b, #475569, #0f172a);
@@ -13,7 +12,7 @@
             min-height: 100vh;
             color: #f8fafc;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            position: relative; /* Crucial for background text positioning */
+            position: relative; 
         }
 
         @keyframes gradientBG {
@@ -22,29 +21,21 @@
             100% { background-position: 0% 50%; }
         }
 
-        /* --- NEW: LARGE DYNAMIC BACKGROUND WATERMARK --- */
         body::before {
-            content: "VIT"; /* The text you want in background */
-            position: fixed; /* Keep it stationary relative to viewport */
-            top: 50%; /* Center vertically */
-            left: 50%; /* Center horizontally */
-            transform: translate(-50%, -50%) rotate(-15deg); /* Perfect centering and cool rotation */
-            
-            font-size: 35vw; /* Extremely big (based on viewport width) */
-            font-weight: 900; /* Extra bold/heavy */
-            
-            /* Subtlest dark gray watermark effect:
-               Uses a slate-gray with very low opacity to blend with the dark bg */
+            content: "VIT"; 
+            position: fixed; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%) rotate(-15deg); 
+            font-size: 35vw; 
+            font-weight: 900; 
             color: rgba(148, 163, 184, 0.05); 
-            
-            z-index: -1; /* Pushes text behind EVERYTHING (navbar, containers, cards) */
-            pointer-events: none; /* Ensures the text cannot be clicked or interfere with input */
-            white-space: nowrap; /* Prevents wrapping on small screens */
-            user-select: none; /* Prevents user from highlighting the background text */
+            z-index: -1; 
+            pointer-events: none; 
+            white-space: nowrap; 
+            user-select: none; 
         }
-        /* ----------------------------------------------- */
 
-        /* Existing Styles - Preservation of all UI elements and dark themes */
         .glass-card {
             background: rgba(255, 255, 255, 0.07);
             backdrop-filter: blur(12px);
@@ -53,7 +44,7 @@
             border-radius: 20px;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
             color: white;
-            position: relative; /* Keep cards on top layer */
+            position: relative; 
             z-index: 1; 
         }
 
@@ -80,9 +71,13 @@
             <div class="ms-auto">
                 {% if session.get('logged_in') %}
                     <a class="btn btn-outline-light btn-sm" href="/admin">Dashboard</a>
+                    <a class="btn btn-outline-info btn-sm ms-2" href="/admin/analysis">Analysis</a>
                     <a class="btn btn-danger btn-sm ms-2" href="/logout">Logout</a>
                 {% elif session.get('register_number') %}
                     <span class="text-light me-3 opacity-75">Reg No: {{ session.get('register_number') }}</span>
+                    <a class="btn btn-danger btn-sm" href="/logout">Logout</a>
+                {% elif session.get('worker_id') %}
+                    <span class="text-warning fw-bold me-3">Worker #{{ session.get('worker_id') }}</span>
                     <a class="btn btn-danger btn-sm" href="/logout">Logout</a>
                 {% endif %}
             </div>
