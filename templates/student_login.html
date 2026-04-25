@@ -1,15 +1,15 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
 {% block content %}
 <div class="row justify-content-center mt-5">
-    <div class="col-md-5">
-        <div class="glass-card p-5">
-            <h3 class="text-center fw-bold mb-4">Student Access</h3>
+    <div class="col-md-4">
+        <div class="glass-card p-5 text-center">
+            <h3 class="fw-bold mb-4">Student Access</h3>
             <form action="/student_login" method="POST">
-                <div class="mb-4">
-                    <label class="form-label fw-semibold">Register Number</label>
-                    <input type="text" name="register_number" class="form-control" required placeholder="e.g. 21BCE1023">
+                <div class="text-start mb-3">
+                    <label class="form-label fw-bold text-light opacity-75">Register Number</label>
+                    <input type="text" class="form-control form-control-lg" name="register_number" placeholder="e.g. 21BCE1023" required>
                 </div>
-                <button type="submit" class="btn btn-light w-100 py-2 fw-bold text-dark">Continue to Portal</button>
+                <button type="submit" class="btn btn-light w-100 btn-lg fw-bold shadow mt-3 text-dark">Continue to Portal</button>
             </form>
         </div>
     </div>

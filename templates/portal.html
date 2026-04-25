@@ -4,13 +4,13 @@
     <div class="col-md-6">
         <div class="text-center mb-4">
             <h2 class="fw-bold text-white">Submit a Request</h2>
-            <p class="text-white opacity-75">Our AI system will automatically detect the urgency of your issue.</p>
+            <p class="text-white opacity-75">Our system will automatically detect the urgency of your issue.</p>
         </div>
         <form action="/submit" method="POST" class="glass-card p-5">
             
             <div class="mb-3">
-                <label class="form-label fw-semibold">Student Email (For Updates)</label>
-                <input type="email" name="email" class="form-control" placeholder="e.g. student@vit.ac.in" required>
+                <label class="form-label fw-semibold">Student Email</label>
+                <input type="email" name="email" class="form-control" required>
             </div>
 
             <div class="mb-3">
@@ -26,6 +26,7 @@
                     <option value="Food">Food</option>
                     <option value="WiFi">WiFi</option>
                     <option value="Room">Room Maintenance</option>
+                    <option value="Other">Other</option>
                 </select>
             </div>
             <div class="mb-4">

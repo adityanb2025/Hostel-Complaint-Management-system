@@ -4,6 +4,8 @@ import subprocess
 import math
 import json
 import smtplib
+import re
+from datetime import datetime
 from email.mime.text import MIMEText
 import threading
 from database import get_db_connection, init_db
@@ -59,7 +61,7 @@ def analyze_urgency(description, category):
     return 1 
 
 def get_best_worker(category):
-    worker_map = {'Electricity': (1,25), 'WiFi': (1,25), 'Water': (26,50), 'Food': (51,75), 'Room': (76,100)}
+    worker_map = {'Electricity': (1,25), 'WiFi': (1,25), 'Water': (26,50), 'Food': (51,75), 'Room': (76,100), 'Other': (76,100)}
     start_id, end_id = worker_map[category]
     conn = get_db_connection()
     query = '''
@@ -79,8 +81,25 @@ def landing():
 @app.route('/student_login', methods=['GET', 'POST'])
 def student_login():
     if request.method == 'POST':
-        session['register_number'] = request.form['register_number']
+        reg_no = request.form['register_number'].strip().upper()
+        
+        pattern = r'^(\d{2})[A-Z]{3}\d{4}$'
+        match = re.match(pattern, reg_no)
+        
+        if not match:
+            flash("Invalid registration number", "danger")
+            return redirect(url_for('student_login'))
+            
+        join_year = int(match.group(1))
+        current_year = datetime.now().year % 100
+        
+        if not (current_year - 5 <= join_year <= current_year):
+            flash("Invalid registration number", "danger")
+            return redirect(url_for('student_login'))
+
+        session['register_number'] = reg_no
         return redirect(url_for('portal'))
+        
     return render_template('student_login.html')
 
 @app.route('/portal')
@@ -112,7 +131,8 @@ def submit():
     conn.close()
     
     threading.Thread(target=send_registration_email, args=(email, ticket_id, room)).start()
-    flash(f"Complaint submitted! Automatically assigned to Worker #{assigned_worker}.", "success")
+    
+    flash("Complaint submitted!", "success")
     return redirect(url_for('portal'))
 
 @app.route('/verify/<int:ticket_id>/<action>')
@@ -231,7 +251,6 @@ def reassign_worker():
     ticket_id = request.form['ticket_id']
     new_worker = request.form['new_worker']
     conn = get_db_connection()
-    # NEW: Automatically sets status back to 'Pending' so the new worker sees it properly.
     conn.execute('UPDATE complaints SET worker_id=?, status="Pending" WHERE id=?', (new_worker, ticket_id))
     conn.commit()
     conn.close()
@@ -288,10 +307,10 @@ def admin():
                 tid = parts[0]
                 score = int(parts[3])
                 
-                # Restore V1 Label mapping
-                if score >= 40: label, color = "Very High", "danger"
-                elif score >= 20: label, color = "High", "warning text-dark"
-                elif score >= 10: label, color = "Medium", "info text-dark"
+                # NEW ADJUSTED CURVE
+                if score >= 45: label, color = "Very High", "danger"
+                elif score >= 30: label, color = "High", "warning text-dark"
+                elif score >= 15: label, color = "Medium", "info text-dark"
                 else: label, color = "Low", "secondary"
 
                 if filter_urgency and label != filter_urgency:
