@@ -5,6 +5,8 @@ import math
 import json
 import smtplib
 import re
+import os
+from werkzeug.utils import secure_filename
 from datetime import datetime
 from email.mime.text import MIMEText
 import threading
@@ -13,8 +15,18 @@ from database import get_db_connection, init_db
 app = Flask(__name__)
 app.secret_key = "super_secret_hostel_key" 
 
+# --- EMAIL CONFIGURATION ---
 SENDER_EMAIL = "VIT.hostelcomplaints@gmail.com"
 APP_PASSWORD = "ofpwpkibanrsrwyt" 
+
+# --- IMAGE UPLOAD CONFIGURATION ---
+UPLOAD_FOLDER = 'static/uploads'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)  # Auto-creates folder if it doesn't exist
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def send_registration_email(recipient_email, ticket_id, room):
     try:
@@ -113,6 +125,17 @@ def submit():
     reg_no, email = session.get('register_number'), request.form['email']
     room, cat, desc = request.form['room'], request.form['category'], request.form['description']
     
+    # NEW: Handle Image Upload
+    image_filename = None
+    if 'image' in request.files:
+        file = request.files['image']
+        if file and file.filename != '' and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            # Add timestamp to make filename perfectly unique
+            unique_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}"
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
+            image_filename = unique_filename
+
     conn = get_db_connection()
     
     active_check = conn.execute("SELECT id FROM complaints WHERE register_number=? AND category=? AND status IN ('Pending', 'Reopened')", (reg_no, cat)).fetchone()
@@ -124,8 +147,9 @@ def submit():
     auto_urgency = analyze_urgency(desc, cat)
     assigned_worker = get_best_worker(cat) 
     
-    cursor = conn.execute('INSERT INTO complaints (register_number, email, room_number, category, urgency, description, worker_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                 (reg_no, email, room, cat, auto_urgency, desc, assigned_worker))
+    # NEW: Save image_filename to Database
+    cursor = conn.execute('INSERT INTO complaints (register_number, email, room_number, category, urgency, description, image_filename, worker_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                 (reg_no, email, room, cat, auto_urgency, desc, image_filename, assigned_worker))
     ticket_id = cursor.lastrowid 
     conn.commit()
     conn.close()
@@ -172,11 +196,15 @@ def worker_dashboard():
         per_page_str = '10'
 
     conn = get_db_connection()
-    query = '''SELECT id, room_number, category, urgency, status, worker_id, 
+    # NEW: Fetch description and image_filename
+    query = '''SELECT id, room_number, category, urgency, status, worker_id, description, image_filename,
                CAST((julianday('now') - julianday(created_at)) / 7 AS INTEGER) as age_weeks 
                FROM complaints WHERE status IN ("Pending", "Reopened") AND worker_id = ?'''
     rows = conn.execute(query, (wid,)).fetchall()
     conn.close()
+
+    # Map details to ID so we can append them after C++ sorting
+    details_map = {str(r['id']): {'desc': r['description'], 'img': r['image_filename']} for r in rows}
 
     input_data = [f"{r['id']} {r['room_number']} {r['category']} {r['urgency'] + 10 if r['status'] == 'Reopened' else r['urgency']} {r['age_weeks']}" for r in rows]
     sorted_complaints = []
@@ -187,7 +215,15 @@ def worker_dashboard():
         for line in stdout.strip().split('\n'):
             if line:
                 parts = line.split('|')
-                sorted_complaints.append({'id': parts[0], 'room': parts[1], 'category': parts[2]})
+                tid = parts[0]
+                details = details_map.get(tid, {'desc': 'No description provided.', 'img': None})
+                sorted_complaints.append({
+                    'id': tid, 
+                    'room': parts[1], 
+                    'category': parts[2],
+                    'description': details['desc'],
+                    'image': details['img']
+                })
 
     total_items = len(sorted_complaints)
     if per_page is None:
@@ -307,7 +343,6 @@ def admin():
                 tid = parts[0]
                 score = int(parts[3])
                 
-                # NEW ADJUSTED CURVE
                 if score >= 45: label, color = "Very High", "danger"
                 elif score >= 30: label, color = "High", "warning text-dark"
                 elif score >= 15: label, color = "Medium", "info text-dark"

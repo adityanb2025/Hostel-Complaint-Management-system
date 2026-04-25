@@ -6,7 +6,7 @@
             <h2 class="fw-bold text-white">Submit a Request</h2>
             <p class="text-white opacity-75">Our system will automatically detect the urgency of your issue.</p>
         </div>
-        <form action="/submit" method="POST" class="glass-card p-5">
+        <form action="/submit" method="POST" enctype="multipart/form-data" class="glass-card p-5">
             
             <div class="mb-3">
                 <label class="form-label fw-semibold">Student Email</label>
@@ -17,6 +17,7 @@
                 <label class="form-label fw-semibold">Room Number</label>
                 <input type="text" name="room" class="form-control" required>
             </div>
+            
             <div class="mb-3">
                 <label class="form-label fw-semibold">Category</label>
                 <select name="category" class="form-select" required>
@@ -29,10 +30,17 @@
                     <option value="Other">Other</option>
                 </select>
             </div>
-            <div class="mb-4">
+            
+            <div class="mb-3">
                 <label class="form-label fw-semibold">Detailed Description</label>
                 <textarea name="description" class="form-control" rows="4" required></textarea>
             </div>
+            
+            <div class="mb-4">
+                <label class="form-label fw-semibold">Upload Image (Optional)</label>
+                <input type="file" name="image" class="form-control bg-dark text-light border-secondary" accept="image/*">
+            </div>
+            
             <button type="submit" class="btn btn-light w-100 py-2 fw-bold text-dark">Submit Complaint</button>
         </form>
     </div>

@@ -27,7 +27,7 @@ def init_db():
         else: role = 'Carpenter'
         conn.execute('INSERT INTO workers (id, role) VALUES (?, ?)', (i, role))
 
-    # Create Complaints Table (Replaced age_weeks with dynamic created_at timestamp)
+    # Create Complaints Table (Added image_filename)
     conn.execute('''
         CREATE TABLE complaints (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,6 +37,7 @@ def init_db():
             category TEXT NOT NULL,
             urgency INTEGER NOT NULL,
             description TEXT,
+            image_filename TEXT,
             status TEXT DEFAULT 'Pending',
             worker_id INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -47,4 +48,4 @@ def init_db():
 
 if __name__ == "__main__":
     init_db()
-    print("Database wiped and initialized for Version 2.0 (Workers & Timestamps).")
+    print("Database wiped and initialized for Version 3.0 (Image Support!).")
