@@ -15,15 +15,13 @@ from database import get_db_connection, init_db
 app = Flask(__name__)
 app.secret_key = "super_secret_hostel_key" 
 
-# --- EMAIL CONFIGURATION ---
 SENDER_EMAIL = "VIT.hostelcomplaints@gmail.com"
 APP_PASSWORD = "ofpwpkibanrsrwyt" 
 
-# --- IMAGE UPLOAD CONFIGURATION ---
 UPLOAD_FOLDER = 'static/uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)  # Auto-creates folder if it doesn't exist
+os.makedirs(UPLOAD_FOLDER, exist_ok=True) 
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -125,13 +123,11 @@ def submit():
     reg_no, email = session.get('register_number'), request.form['email']
     room, cat, desc = request.form['room'], request.form['category'], request.form['description']
     
-    # NEW: Handle Image Upload
     image_filename = None
     if 'image' in request.files:
         file = request.files['image']
         if file and file.filename != '' and allowed_file(file.filename):
             filename = secure_filename(file.filename)
-            # Add timestamp to make filename perfectly unique
             unique_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}"
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
             image_filename = unique_filename
@@ -147,7 +143,6 @@ def submit():
     auto_urgency = analyze_urgency(desc, cat)
     assigned_worker = get_best_worker(cat) 
     
-    # NEW: Save image_filename to Database
     cursor = conn.execute('INSERT INTO complaints (register_number, email, room_number, category, urgency, description, image_filename, worker_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                  (reg_no, email, room, cat, auto_urgency, desc, image_filename, assigned_worker))
     ticket_id = cursor.lastrowid 
@@ -182,6 +177,7 @@ def worker_login():
         flash("Invalid Worker ID. Must be 1-100.", "danger")
     return render_template('worker_login.html')
 
+# --- NEW: Added filtering logic to the worker dashboard ---
 @app.route('/worker')
 def worker_dashboard():
     if not session.get('worker_id'): return redirect(url_for('worker_login'))
@@ -195,20 +191,28 @@ def worker_dashboard():
         page, per_page = 1, 10
         per_page_str = '10'
 
-    conn = get_db_connection()
-    # NEW: Fetch description and image_filename
+    # Get Filter Parameters
+    filter_urgency = request.args.get('urgency', '')
+    search_id = request.args.get('ticket_id', '').strip()
+    search_id_clean = search_id.replace('#', '')
+
     query = '''SELECT id, room_number, category, urgency, status, worker_id, description, image_filename,
                CAST((julianday('now') - julianday(created_at)) / 7 AS INTEGER) as age_weeks 
                FROM complaints WHERE status IN ("Pending", "Reopened") AND worker_id = ?'''
-    rows = conn.execute(query, (wid,)).fetchall()
+    params = [wid]
+
+    if search_id_clean.isdigit():
+        query += ' AND id = ?'
+        params.append(int(search_id_clean))
+
+    conn = get_db_connection()
+    rows = conn.execute(query, params).fetchall()
     conn.close()
 
-    # Map details to ID so we can append them after C++ sorting
-    details_map = {str(r['id']): {'desc': r['description'], 'img': r['image_filename']} for r in rows}
-
+    details_map = {str(r['id']): {'desc': r['description'], 'img': r['image_filename'], 'status': r['status']} for r in rows}
     input_data = [f"{r['id']} {r['room_number']} {r['category']} {r['urgency'] + 10 if r['status'] == 'Reopened' else r['urgency']} {r['age_weeks']}" for r in rows]
-    sorted_complaints = []
     
+    sorted_complaints = []
     if input_data:
         process = subprocess.Popen(['./dsa/priority_engine'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
         stdout, _ = process.communicate(input="\n".join(input_data))
@@ -216,13 +220,26 @@ def worker_dashboard():
             if line:
                 parts = line.split('|')
                 tid = parts[0]
-                details = details_map.get(tid, {'desc': 'No description provided.', 'img': None})
+                score = int(parts[3])
+                
+                if score >= 45: label, color = "Very High", "danger"
+                elif score >= 30: label, color = "High", "warning text-dark"
+                elif score >= 15: label, color = "Medium", "info text-dark"
+                else: label, color = "Low", "secondary"
+
+                if filter_urgency and label != filter_urgency:
+                    continue
+
+                details = details_map.get(tid, {'desc': 'No description provided.', 'img': None, 'status': 'Pending'})
                 sorted_complaints.append({
                     'id': tid, 
                     'room': parts[1], 
                     'category': parts[2],
                     'description': details['desc'],
-                    'image': details['img']
+                    'image': details['img'],
+                    'status': details['status'],
+                    'label': label,
+                    'color': color
                 })
 
     total_items = len(sorted_complaints)
@@ -235,8 +252,15 @@ def worker_dashboard():
         display_complaints = sorted_complaints[start:end]
         total_pages = math.ceil(total_items / per_page) if per_page > 0 else 1
 
-    return render_template('worker.html', complaints=display_complaints, wid=wid, 
-                           page=page, per_page=per_page_str, total_pages=total_pages, total_items=total_items)
+    return render_template('worker.html', 
+                           complaints=display_complaints, 
+                           wid=wid, 
+                           page=page, 
+                           per_page=per_page_str, 
+                           total_pages=total_pages, 
+                           total_items=total_items,
+                           filter_urgency=filter_urgency,
+                           search_id=search_id)
 
 @app.route('/worker_batch_complete', methods=['POST'])
 def worker_batch_complete():
