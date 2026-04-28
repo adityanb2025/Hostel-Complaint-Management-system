@@ -64,15 +64,17 @@
         </thead>
         <tbody>
             {% for c in complaints %}
-            <tr data-bs-toggle="collapse" data-bs-target="#details-{{ c.id }}" aria-expanded="false" style="cursor: pointer;">
-                <td class="fw-bold text-info">#{{ c.id }}</td>
+            <tr>
+                <td class="fw-bold text-info" data-bs-toggle="collapse" data-bs-target="#details-{{ c.id }}" aria-expanded="false" style="cursor: pointer; width: 15%;">
+                    #{{ c.id }} <span style="font-size: 0.7em; opacity: 0.7;">▼</span>
+                </td>
                 <td>{{ c.room }}</td>
                 <td>{{ c.category }}</td>
                 <td><span class="badge bg-{{ c.color }} shadow-sm px-2 py-1 rounded-pill">{{ c.label }}</span></td>
                 
                 <td>
                     <span class="badge bg-danger p-2 shadow-sm" id="status-{{ c.id }}" 
-                          onclick="event.stopPropagation(); toggleStatus('{{ c.id }}')" style="cursor: pointer; user-select: none;">
+                          onclick="toggleStatus('{{ c.id }}')" style="cursor: pointer; user-select: none;">
                         Pending
                     </span>
                 </td>
